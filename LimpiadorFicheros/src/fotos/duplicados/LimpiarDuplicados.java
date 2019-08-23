@@ -60,7 +60,7 @@ public class LimpiarDuplicados {
 		System.out.println("\nDuplicados encontrados (que queremos borrar) = " + candidatoDuplicados.size());
 
 		// ---------- Borrar duplicados
-		eliminarListaFicheros(candidatoDuplicados);
+		// eliminarListaFicheros(candidatoDuplicados);
 	}
 
 	/**
@@ -130,6 +130,9 @@ public class LimpiarDuplicados {
 		return soloClavesDeDuplicados;
 	}
 
+	/**
+	 * @param eliminables
+	 */
 	public static void eliminarListaFicheros(List<String> eliminables) {
 
 		Long numEliminados = 0L;
