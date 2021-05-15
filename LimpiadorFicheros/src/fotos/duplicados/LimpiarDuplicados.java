@@ -1,12 +1,15 @@
-/**
- * 
- */
 package fotos.duplicados;
 
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,7 +18,16 @@ import java.util.function.Consumer;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
 
+import javax.activation.MimetypesFileTypeMap;
+
 import org.apache.commons.io.FileUtils;
+import org.apache.tika.config.TikaConfig;
+import org.apache.tika.detect.Detector;
+import org.apache.tika.exception.TikaException;
+import org.apache.tika.io.TikaInputStream;
+import org.apache.tika.metadata.Metadata;
+import org.apache.tika.mime.MediaType;
+import org.apache.tika.mime.MimeType;
 
 /**
  * Dada una carpeta, busca y elimina todos los duplicados en esa carpeta y
@@ -24,9 +36,13 @@ import org.apache.commons.io.FileUtils;
  */
 public class LimpiarDuplicados {
 
-	public static final String PATH_BASE = "D:\\DATOS Y DOCUMENTOS\\IMAGENES_20190101\\NO_ANIMALES";
+	public static final String PATH_BASE = "/RUTA";
+	public static final String DIR_IMG = PATH_BASE + "/img";
+	public static final String DIR_VID = PATH_BASE + "/vid";
 
-	public static void main(String[] args) throws IOException {
+	private static boolean isFinished = false;
+
+	public static void main(String[] args) throws IOException, TikaException {
 
 		// Path + hash + tamanho --> Ante dos hash iguales, pero con distinto tamanho,
 		// lanza warning
@@ -45,7 +61,6 @@ public class LimpiarDuplicados {
 		for (String path_file : listaFicheros) {
 			contador++;
 			if (contador % 100 == 0) {
-
 				System.out.println(contador + "...");
 			}
 
@@ -59,8 +74,11 @@ public class LimpiarDuplicados {
 
 		System.out.println("\nDuplicados encontrados (que queremos borrar) = " + candidatoDuplicados.size());
 
-		// ---------- Borrar duplicados
-		// eliminarListaFicheros(candidatoDuplicados);
+		// --------- OPERACIONES -------------
+		eliminarListaFicheros(candidatoDuplicados);
+		acumularEnCarpetaUnica(listaFicheros, PATH_BASE);
+		limpiarCarpetasVacias(PATH_BASE);
+		clasificarPorTipo(PATH_BASE);
 	}
 
 	/**
@@ -69,6 +87,8 @@ public class LimpiarDuplicados {
 	 */
 	public static void fetchFiles(File dir, Consumer<File> fileConsumer) {
 
+		// Directorios especiales que queremos excluir
+
 		if (dir.isDirectory()) {
 			for (File file1 : dir.listFiles()) {
 				fetchFiles(file1, fileConsumer);
@@ -76,6 +96,7 @@ public class LimpiarDuplicados {
 		} else {
 			fileConsumer.accept(dir);
 		}
+
 	}
 
 	/**
@@ -100,7 +121,7 @@ public class LimpiarDuplicados {
 	}
 
 	/**
-	 * Saca una lista de los duplicados (que son los que borraré)
+	 * Saca una lista de los duplicados (que son los que borrarï¿½)
 	 * 
 	 * @param mapa
 	 * @return
@@ -151,5 +172,190 @@ public class LimpiarDuplicados {
 
 		System.out.println("Numero eliminados = " + numEliminados);
 		System.out.println("Numero errores = " + numErrores);
+	}
+
+	/**
+	 * @param listaFicheros
+	 * @param dirDestinoPath
+	 * @throws IOException
+	 * @throws TikaException
+	 */
+	public static void acumularEnCarpetaUnica(List<String> listaFicheros, String dirDestinoPath)
+			throws IOException, TikaException {
+
+		System.out.println("Acumulando ficheros en carpeta unica: " + dirDestinoPath);
+		long numero = 100000;
+		int numFicherosMovidos = 0;
+
+		for (String path_file : listaFicheros) {
+
+			Path nombreFicheroDestino = Paths.get(crearPathCompletoDestino(path_file, dirDestinoPath, numero));
+			while (Files.exists(nombreFicheroDestino, LinkOption.NOFOLLOW_LINKS)) {
+				numero++;
+				nombreFicheroDestino = Paths.get(crearPathCompletoDestino(path_file, dirDestinoPath, numero));
+			}
+
+			if (Files.exists(Paths.get(path_file))) {
+				Files.move(Paths.get(path_file), nombreFicheroDestino, StandardCopyOption.REPLACE_EXISTING);
+				numFicherosMovidos++;
+			}
+		}
+
+		System.out.println("Numero de ficheros movidos a carpeta unica: " + numFicherosMovidos);
+	}
+
+	/**
+	 * @param path_file_origen
+	 * @param dirDestinoPath
+	 * @param numero
+	 * @return
+	 * @throws TikaException
+	 * @throws IOException
+	 */
+	public static String crearPathCompletoDestino(String path_file_origen, String dirDestinoPath, long numero)
+			throws TikaException, IOException {
+
+		System.out.println("path_file_origen=" + path_file_origen + " --> dirDestinoPath=" + dirDestinoPath
+				+ " -->numero=" + numero);
+
+		long tamanioBytes = FileUtils.sizeOf(new File(path_file_origen));
+
+		MimetypesFileTypeMap fileTypeMap = new MimetypesFileTypeMap();
+		Object tipo = fileTypeMap.getContentType(path_file_origen);
+		TikaConfig tikaConfig = new TikaConfig();
+		Detector detector = tikaConfig.getDetector();
+		File fichero = new File(path_file_origen);
+		InputStream is = new FileInputStream(fichero);
+		TikaInputStream stream = TikaInputStream.get(is);
+		Metadata metadata = new Metadata();
+		metadata.add(Metadata.RESOURCE_NAME_KEY, fichero.getName());
+		MediaType mediaType = detector.detect(stream, metadata);
+		MimeType mimeType = tikaConfig.getMimeRepository().forName(mediaType.toString());
+		String mimeExtension = mimeType.getExtension();
+
+		System.out.println("mimeExtension=" + mimeExtension);
+		String extension = "";
+		if (mimeExtension != null && !mimeExtension.isEmpty()) {
+			extension = mimeExtension.split("\\.")[1];
+		} else {
+			// SI ESTA VACIO
+			extension = (tamanioBytes < 5000000) ? "png" : "mp4"; // Si ocupa <5MB es PNG; si no, es MP4
+		}
+
+		// ESPECIALES
+		if (!extension.isEmpty() && (extension.equals("qt") || extension.equals("bin"))) {
+			extension = "mp4";
+		}
+
+		String pathSalida = dirDestinoPath + "/" + String.valueOf(numero) + "." + extension;
+		System.out.println("path_file_origen=" + path_file_origen + "------>SIZE (Bytes)=" + tamanioBytes
+				+ "------>TIPO=" + tipo + "------>Extension=" + extension + " =====> " + pathSalida);
+
+		return pathSalida;
+	}
+
+	/**
+	 * @param dirPadre
+	 * @throws IOException
+	 */
+	public static void limpiarCarpetasVacias(String dirPadre) throws IOException {
+
+		System.out.println("Limpiando carpetas vacias dentro de esta carpeta padre: " + dirPadre);
+
+		do {
+			isFinished = true;
+			limpiarCarpetasVaciasNucleo(dirPadre);
+		} while (!isFinished);
+
+	}
+
+	/**
+	 * @param dirPadre
+	 * @throws IOException
+	 */
+	public static void limpiarCarpetasVaciasNucleo(String dirPadre) throws IOException {
+
+		System.out.println("Limpiando carpetas vacias dentro de esta carpeta padre: " + dirPadre);
+
+		File folder = new File(dirPadre);
+		File[] listofFiles = folder.listFiles();
+		if (listofFiles.length == 0) {
+			System.out.println("Folder Name :: " + folder.getAbsolutePath() + " is deleted.");
+			folder.delete();
+			isFinished = false;
+		} else {
+			for (int j = 0; j < listofFiles.length; j++) {
+				File file = listofFiles[j];
+				if (file.isDirectory()) {
+					limpiarCarpetasVaciasNucleo(file.getAbsolutePath());
+				}
+			}
+		}
+
+	}
+
+	/**
+	 * @param dirPadre
+	 * @throws IOException
+	 */
+	public static void clasificarPorTipo(String dirPadre) throws IOException {
+
+		System.out.println("Clasificando los ficheros por tipo, en subcarpetas: " + dirPadre);
+
+		String pathDirImagenes = dirPadre + "/img/";
+		String pathDirVideos = dirPadre + "/vid/";
+
+		if (Files.notExists(Paths.get(pathDirImagenes))) {
+			Files.createDirectory(Paths.get(pathDirImagenes));
+		}
+
+		if (Files.notExists(Paths.get(pathDirVideos))) {
+			Files.createDirectory(Paths.get(pathDirVideos));
+		}
+
+		File file = new File(dirPadre);
+		List<String> listaFicheros = new ArrayList<String>();
+		fetchFiles(file, f -> listaFicheros.add(f.getAbsolutePath()));
+		Long numeroFicheroRevisado = 1L;
+
+		for (String path_file : listaFicheros) {
+
+			if (numeroFicheroRevisado % 100 == 0) {
+				System.out
+						.println("Clasificado ficheros por tipos... (nos llegamos por " + numeroFicheroRevisado + ")");
+			}
+
+			String tipo = identifyFileTypeUsingFilesProbeContentType(path_file);
+
+			if (tipo.contains("image")) {
+				Files.move(Paths.get(path_file), Paths.get(DIR_IMG + "/" + Paths.get(path_file).getFileName()));
+			} else if (tipo.contains("video")) {
+				Files.move(Paths.get(path_file), Paths.get(DIR_VID + "/" + Paths.get(path_file).getFileName()));
+			} else {
+				System.out.println("TIPO DESCONOCIDO --> " + path_file + " -> " + tipo);
+			}
+			numeroFicheroRevisado++;
+		}
+
+	}
+
+	/**
+	 * Identify file type of file with provided path and name using JDK 7's
+	 * Files.probeContentType(Path).
+	 *
+	 * @param fileName Name of file whose type is desired.
+	 * @return String representing identified type of file with provided name.
+	 */
+	public static String identifyFileTypeUsingFilesProbeContentType(final String fileName) {
+
+		String fileType = "desconocido";
+		final File file = new File(fileName);
+		try {
+			fileType = Files.probeContentType(file.toPath());
+		} catch (IOException ioException) {
+			System.out.println(
+					"ERROR: Unable to determine file type for " + fileName + " due to exception " + ioException);
+		}
+		return fileType;
 	}
 }
