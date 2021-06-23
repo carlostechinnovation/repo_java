@@ -36,7 +36,7 @@ import org.apache.tika.mime.MimeType;
  */
 public class LimpiarDuplicados {
 
-	public static final String PATH_BASE = "/RUTA";
+	public static final String PATH_BASE = "D:\\Imágenes\\NO_ANIMALES\\PENDIENTES\\";
 	public static final String DIR_IMG = PATH_BASE + "/img";
 	public static final String DIR_VID = PATH_BASE + "/vid";
 
@@ -76,9 +76,9 @@ public class LimpiarDuplicados {
 
 		// --------- OPERACIONES -------------
 		eliminarListaFicheros(candidatoDuplicados);
-		acumularEnCarpetaUnica(listaFicheros, PATH_BASE);
-		limpiarCarpetasVacias(PATH_BASE);
-		clasificarPorTipo(PATH_BASE);
+//		acumularEnCarpetaUnica(listaFicheros, PATH_BASE);
+//		limpiarCarpetasVacias(PATH_BASE);
+//		clasificarPorTipo(PATH_BASE);
 	}
 
 	/**
@@ -155,7 +155,7 @@ public class LimpiarDuplicados {
 	 * @param eliminables
 	 */
 	public static void eliminarListaFicheros(List<String> eliminables) {
-
+		System.out.println("eliminarListaFicheros() - INICIO");
 		Long numEliminados = 0L;
 		Long numErrores = 0L;
 
@@ -172,6 +172,7 @@ public class LimpiarDuplicados {
 
 		System.out.println("Numero eliminados = " + numEliminados);
 		System.out.println("Numero errores = " + numErrores);
+		System.out.println("eliminarListaFicheros() - FIN");
 	}
 
 	/**
@@ -182,6 +183,8 @@ public class LimpiarDuplicados {
 	 */
 	public static void acumularEnCarpetaUnica(List<String> listaFicheros, String dirDestinoPath)
 			throws IOException, TikaException {
+
+		System.out.println("acumularEnCarpetaUnica() - INICIO");
 
 		System.out.println("Acumulando ficheros en carpeta unica: " + dirDestinoPath);
 		long numero = 100000;
@@ -202,6 +205,7 @@ public class LimpiarDuplicados {
 		}
 
 		System.out.println("Numero de ficheros movidos a carpeta unica: " + numFicherosMovidos);
+		System.out.println("acumularEnCarpetaUnica() - FIN");
 	}
 
 	/**
@@ -260,6 +264,7 @@ public class LimpiarDuplicados {
 	 */
 	public static void limpiarCarpetasVacias(String dirPadre) throws IOException {
 
+		System.out.println("limpiarCarpetasVacias() - INICIO");
 		System.out.println("Limpiando carpetas vacias dentro de esta carpeta padre: " + dirPadre);
 
 		do {
@@ -267,6 +272,7 @@ public class LimpiarDuplicados {
 			limpiarCarpetasVaciasNucleo(dirPadre);
 		} while (!isFinished);
 
+		System.out.println("limpiarCarpetasVacias() - FIN");
 	}
 
 	/**
@@ -300,6 +306,7 @@ public class LimpiarDuplicados {
 	 */
 	public static void clasificarPorTipo(String dirPadre) throws IOException {
 
+		System.out.println("clasificarPorTipo() - INICIO");
 		System.out.println("Clasificando los ficheros por tipo, en subcarpetas: " + dirPadre);
 
 		String pathDirImagenes = dirPadre + "/img/";
@@ -337,6 +344,7 @@ public class LimpiarDuplicados {
 			numeroFicheroRevisado++;
 		}
 
+		System.out.println("clasificarPorTipo() - FIN");
 	}
 
 	/**
