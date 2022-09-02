@@ -10,7 +10,9 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,23 +38,25 @@ import org.apache.tika.mime.MimeType;
  */
 public class LimpiarDuplicados {
 
-	public static final String PATH_BASE = "D:\\Imágenes\\NO_ANIMALES\\PENDIENTES\\";
+	public static final String PATH_BASE = "D:\\Imágenes\\NO_ANIMALES\\";
 	public static final String DIR_IMG = PATH_BASE + "/img";
 	public static final String DIR_VID = PATH_BASE + "/vid";
 
 	private static boolean isFinished = false;
+	private static SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
 	public static void main(String[] args) throws IOException, TikaException {
 
 		// Path + hash + tamanho --> Ante dos hash iguales, pero con distinto tamanho,
 		// lanza warning
 
+		System.out.println(
+				formatter.format(new Date()) + " - Obteniendo subcarpetas y ficheros de PATH_BASE=" + PATH_BASE);
 		List<String> listaFicheros = new ArrayList<String>();
-
 		File file = new File(PATH_BASE);
-		fetchFiles(file, f -> listaFicheros.add(f.getAbsolutePath()));
+		fetchFiles(file, f -> listaFicheros.add(f.getAbsolutePath()), 1);
 
-		System.out.println("Rutas sacadas: " + listaFicheros.size());
+		System.out.println(formatter.format(new Date()) + " - Rutas sacadas: " + listaFicheros.size());
 
 		// -------------------------------
 		Map<String, String> mapa = new HashMap<String, String>();
@@ -61,7 +65,7 @@ public class LimpiarDuplicados {
 		for (String path_file : listaFicheros) {
 			contador++;
 			if (contador % 100 == 0) {
-				System.out.println(contador + "...");
+				System.out.println(formatter.format(new Date()) + " - " + contador + "...");
 			}
 
 			long cs = getChecksumValue(new CRC32(), path_file);
@@ -72,7 +76,8 @@ public class LimpiarDuplicados {
 
 		List<String> candidatoDuplicados = buscaDuplicados(mapa);
 
-		System.out.println("\nDuplicados encontrados (que queremos borrar) = " + candidatoDuplicados.size());
+		System.out.println(formatter.format(new Date()) + " - Duplicados encontrados (que queremos borrar) = "
+				+ candidatoDuplicados.size());
 
 		// --------- OPERACIONES -------------
 		eliminarListaFicheros(candidatoDuplicados);
@@ -84,14 +89,26 @@ public class LimpiarDuplicados {
 	/**
 	 * @param dir
 	 * @param fileConsumer
+	 * @param nivelProfundidad 1-superficial; 2-profundo.
 	 */
-	public static void fetchFiles(File dir, Consumer<File> fileConsumer) {
+	public static void fetchFiles(File dir, Consumer<File> fileConsumer, int nivelProfundidad) {
 
 		// Directorios especiales que queremos excluir
-
 		if (dir.isDirectory()) {
-			for (File file1 : dir.listFiles()) {
-				fetchFiles(file1, fileConsumer);
+
+			if (nivelProfundidad == 1) {
+				System.out.println(formatter.format(new Date()) + " Revisando directorio y sus subcarpetas: "
+						+ dir.getAbsolutePath());
+			}
+
+			File[] lista = dir.listFiles();
+
+			for (File file1 : lista) {
+				if (nivelProfundidad == 1) {
+					System.out.println(formatter.format(new Date()) + "\t Subcarpeta: " + file1.getAbsolutePath());
+				}
+
+				fetchFiles(file1, fileConsumer, 2);
 			}
 		} else {
 			fileConsumer.accept(dir);
@@ -121,7 +138,7 @@ public class LimpiarDuplicados {
 	}
 
 	/**
-	 * Saca una lista de los duplicados (que son los que borrarï¿½)
+	 * Saca una lista de los duplicados (que son los que borrara)
 	 * 
 	 * @param mapa
 	 * @return
@@ -131,7 +148,8 @@ public class LimpiarDuplicados {
 		List<String> valoresLeidos = new ArrayList<String>();
 		List<String> soloClavesDeDuplicados = new ArrayList<String>();
 
-		System.out.println("Buscando duplicados en un map de " + mapa.size() + " claves...");
+		System.out.println(
+				formatter.format(new Date()) + " - Buscando duplicados en un map de " + mapa.size() + " claves...");
 
 		for (String path_file : mapa.keySet()) {
 
@@ -147,7 +165,7 @@ public class LimpiarDuplicados {
 			}
 		}
 
-		System.out.println("Buscando duplicados: FIN");
+		System.out.println(formatter.format(new Date()) + " - Buscando duplicados: FIN");
 		return soloClavesDeDuplicados;
 	}
 
@@ -322,7 +340,7 @@ public class LimpiarDuplicados {
 
 		File file = new File(dirPadre);
 		List<String> listaFicheros = new ArrayList<String>();
-		fetchFiles(file, f -> listaFicheros.add(f.getAbsolutePath()));
+		fetchFiles(file, f -> listaFicheros.add(f.getAbsolutePath()), 1);
 		Long numeroFicheroRevisado = 1L;
 
 		for (String path_file : listaFicheros) {
